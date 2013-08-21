@@ -15,6 +15,7 @@ import net.sf.samtools.CigarOperator;
 import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMSequenceRecord;
+import org.apache.commons.lang3.Range;
 
 /**
  *
@@ -31,7 +32,7 @@ public class ParseSVFromBACAlignment {
         
         File inputBam = new File("/home/wim/Analysis/ratfounder/bac/rnor5/13BACS_OnlyHighQualSorted.bam"); 
         
-       // parseIndelInAlignments(inputBam);
+        parseIndelInAlignments(inputBam);
         
         parseIndelsBetweenAlignments(inputBam);
         
@@ -45,6 +46,12 @@ public class ParseSVFromBACAlignment {
 
     private static void parseIndelInAlignments(File inputBam) {
         SAMFileReader bamreader = new SAMFileReader(inputBam);
+        
+        List<Deletion> deletionList = new ArrayList<Deletion>();
+        
+        
+        
+        
         
         for(SAMRecord samRecord : bamreader)
         {
@@ -65,7 +72,35 @@ public class ParseSVFromBACAlignment {
                     
                     if(cigarElementLenght > 100 )
                     {
-                        System.out.println("deletion found from " + currentChrom +":"  + cigarElementStart + "-" + cigarElementEnd );
+                        //System.out.println("deletion found from " + currentChrom +":"  + cigarElementStart + "-" + cigarElementEnd );
+                        //System.out.println(currentChrom+ "\t"+cigarElementStart+"\t"+cigarElementEnd+"\t"+"deletion");
+                        //if there are previous deletions check is this one falls within 100 bp of the previous one. If so update the of the last one to be the end of this one 
+                        if(deletionList.size() > 0)
+                        {
+                            Deletion previousDeletion = deletionList.get(deletionList.size()-1 );
+                            Integer previousDeletionEnd = previousDeletion.getLocation().getMaximum();
+                            
+                            
+                            if(previousDeletion.getChromosome().equals(currentChrom) &&  cigarElementStart - previousDeletionEnd  < 1000   )
+                            {
+                                previousDeletion.updateLocationEnd(cigarElementEnd);
+                            }
+                            else
+                            {
+                                 Deletion deletion = new Deletion(Range.between(cigarElementStart, cigarElementEnd), currentChrom);
+                                deletionList.add(deletion);
+                            }
+                        }
+                        else
+                        {
+                             Deletion deletion = new Deletion(Range.between(cigarElementStart, cigarElementEnd), currentChrom);
+                             deletionList.add(deletion);
+                        }
+                        
+                        
+                       
+                        
+                        
                     }  
                 }
                  if(cigarElement.getOperator() == CigarOperator.I)
@@ -76,7 +111,8 @@ public class ParseSVFromBACAlignment {
                     
                     if(cigarElementLenght > 100 )
                     {
-                        System.out.println("insertion found at " + currentChrom +":"  + cigarElementStart );
+                        //System.out.println("insertion found at " + currentChrom +":"  + cigarElementStart );
+                        //System.out.println(currentChrom+ "\t"+(cigarElementStart-1)+"\t"+cigarElementStart+"\t"+"insertion");
                     }  
                 }  
                 
@@ -88,6 +124,13 @@ public class ParseSVFromBACAlignment {
                 } 
             }            
         }
+        
+        for(Deletion deletion : deletionList)
+        {
+            System.out.println(deletion.getChromosome()+ "\t"+deletion.getLocation().getMinimum()+"\t"+deletion.getLocation().getMaximum()+"\t"+"deletion");
+        }
+        
+        
     }
 
     private static void parseIndelsBetweenAlignments(File inputBam) {
